@@ -54,8 +54,7 @@ export default class ExampleBoundary extends Component {
           return (
             // eslint-disable-next-line jsx-a11y/anchor-is-valid
             <a 
-              onClick={() => Sentry.showReportDialog({ eventId: 'f2e93175c63b4d7895bf4882e48c7970' })
-            }>{this.props.children}</a>
+              onClick={() => Sentry.captureMessage("You trigger something bad")}>{this.props.children}</a>
           );
         }
     }
