@@ -6,7 +6,7 @@ Sentry.init({
  dsn: "https://fdefeaabf2a243f695629d8b4e1a05b2@sentry.io/1448458",
  environment: 'staging',
  debug: true,
- release: "my-project-name@2.3.12",
+ release: "new-release",
  beforeSend(event, hint) {
    console.log(event, hint)
    return event
