@@ -28,7 +28,7 @@ export default class ExampleBoundary extends Component {
           message: 'Authenticated user zhengchao',
           level: 'error'
         });
-        Sentry.captureMessage("Something went wrong");
+        // Sentry.captureMessage("Something went wrong");
     }
 
     componentDidCatch(error, errorInfo) {
