@@ -28,9 +28,6 @@ export default class ExampleBoundary extends Component {
           message: 'Authenticated user zhengchao',
           level: 'error'
         });
-        setTimeout(() => {
-          Sentry.captureMessage("something going bad after 3s");
-        }, 3000);
     }
 
     componentDidCatch(error, errorInfo) {
