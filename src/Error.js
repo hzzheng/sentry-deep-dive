@@ -9,7 +9,11 @@ class Error extends Component {
   }
 
   handleClick() {
-    throw new Error('Ahhhhhhhhhh!')
+    const { name2 } = this.state
+
+    this.setState({
+      name: name2.evil + 1
+    })
   }
 
   render() {
