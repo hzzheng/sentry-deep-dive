@@ -7,9 +7,16 @@ class Error extends Component {
       name: 's'
     };
   }
+
+  handleClick() {
+    throw new Error('Ahhhhhhhhhh!')
+  }
+
   render() {
     return (
-      <div>error</div>
+      <div onClick={this.handleClick}>
+        click me to throw en error
+      </div>
     );
   }
 }
