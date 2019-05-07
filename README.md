@@ -3,10 +3,11 @@
 本指南包含以下几个部分：
 
 -  如何上手
--  如何处理事件
+-  如何上报事件
 -  如何设置 Context
--  如何处理 Breadcrumbs
+-  如何设置 Breadcrumbs
 -  如何收集用户反馈
+-  如何设置 Release
 
 ---
 
@@ -44,7 +45,7 @@ Sentry.init({ dsn: 'https://fdefeaabf2a243f695629d8b4e1a05b2@sentry.io/1448458' 
 
 其他配置项请参考官方文档 [Configuration](https://docs.sentry.io/error-reporting/configuration/?platform=node)。
 
-#### 如何处理事件
+#### 如何上报事件
 
 ##### 1. 捕获事件
 Sentry SDK会自动上报fatal errors。你也可以自己手动上报错误。示例代码如下：
@@ -64,7 +65,7 @@ Sentry.captureMessage('Something went wrong');
 
 ##### 2. 过滤事件
 
-可以对上报的事件做一些自定义处理，使用`beforeSend`配置项，示例代码如下：
+可以对上报的事件做一些自定义处理，在init的时候使用`beforeSend`配置项，示例代码如下：
 
 ```node
 Sentry.init({
@@ -133,7 +134,7 @@ Sentry.configureScope((scope) => {
 });
 ```
 
-#### 如何处理 Breadcrumbs
+#### 如何设置 Breadcrumbs
 
 Sentry中Breadcrumbs指的是某个事件触发的路径，它会记录事件触发前触发的一些列事件。通常Sentry会自动搜集记录这些事件，比如异常发生之前的点击事件等。
 
@@ -174,3 +175,24 @@ Sentry.showReportDialog({ eventId: '{{ sentry_event_id }}' })
 
 `eventId`是关联的事件id，其他可选参数可以参考官方文档 [User Feedback](https://docs.sentry.io/enriching-error-data/user-feedback/?platform=node)。
 
+#### 如何设置 Release
+
+一个release代表了待部署代码的某个版本，设置了release以后，能够开启Sentry更多的功能，比如关联commit和release能够推断出哪个commit引入了问题，并且谁应该负责。具体设置分三个步骤：
+
+- 配置 SDK
+- 创建 Realse 并且关联 Commits
+- 当你部署一个 Release 的时候告知Sentry
+
+##### 1. 配置 SDK
+
+在init中设置release，值可以是任意的字符串，可以用git SHA，需要注意的是，这个值在一个organization（组织）内需要是唯一的。示例代码如下：
+
+```node
+Sentry.init({
+  release: "my-project-name@2.3.12"
+})
+```
+
+这样做以后，每次上报错误的时候都会带上release版本信息。建议在真实部署代码之前告知Sentry有新的部署，以解锁一些Release相关功能。不过，Sentry也会在第一次收到带release信息的错误后自动在系统中创建一个Release。
+
+##### 2. 创建 Realse 并且关联 Commits
