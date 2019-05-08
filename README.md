@@ -8,7 +8,8 @@
 -  如何设置 Breadcrumbs
 -  如何收集用户反馈
 -  如何设置 Release
-
+-  如何设置事件分组
+-  如何设置 SourceMaps
 ---
 
 #### 如何上手
@@ -40,7 +41,7 @@ Sentry.init({ dsn: 'https://fdefeaabf2a243f695629d8b4e1a05b2@sentry.io/1448458' 
 除了dsn，还有以下一些重要的配置项：
 
 - `release`: 代表某个代码版本。设置`release`后会开启一些Sentry功能，包括应用`source maps`，具体见文章相应段落。
-- `environment`: 设置环境。在Sentry后台可以通过环境过滤Issues，Releases等。
+- `environment`: 设置环境。在Sentry后台可以通过环境过滤Issues，releases等。
 - `debug`: 是否开启debug模式，开启后会在浏览器控制台打印一些debugging信息。
 
 其他配置项请参考官方文档 [Configuration](https://docs.sentry.io/error-reporting/configuration/?platform=node)。
@@ -181,7 +182,7 @@ Sentry.showReportDialog({ eventId: '{{ sentry_event_id }}' })
 
 - 配置 SDK
 - 创建 Realse 并且关联 Commits
-- 当你部署一个 Release 的时候告知Sentry
+- 当你部署一个 release 的时候告知Sentry
 
 ##### 1. 配置 SDK
 
@@ -193,6 +194,200 @@ Sentry.init({
 })
 ```
 
-这样做以后，每次上报错误的时候都会带上release版本信息。建议在真实部署代码之前告知Sentry有新的部署，以解锁一些Release相关功能。不过，Sentry也会在第一次收到带release信息的错误后自动在系统中创建一个Release。
+这样做以后，每次上报错误的时候都会带上release版本信息。建议在真实部署代码之前告知Sentry有新的部署，以解锁一些release相关功能。不过，Sentry也会在第一次收到带release信息的错误后自动在系统中创建一个release。
 
-##### 2. 创建 Realse 并且关联 Commits
+##### 2. 创建 release 并且关联 commits
+
+有两种方式可以做，一种是关联代码仓库，另一种是手动上传commit数据，推荐第一种，这里也只介绍第一种方式。
+
+###### 关联仓库
+
+在 Organization Settings > Integrations 中，可以连接相应仓库，如图所示：
+
+![](https://docs.sentry.io/assets/releases-repo-integrations-b18d5eb561ed71eb65307c92db632c0173b605f92742be81777012b2c09e6e3f.png)
+
+![](https://docs.sentry.io/assets/releases-repo-add-8cb7b6c6c5368b356a1962bd37eb90724164d66c0edda5fa490743be5a298241.png)
+
+###### 关联 commits 到某个 release
+
+在部署过程中，添加一个步骤在 Sentry 上创建 release 并关联commits。有两种方式可以实现：
+
+1. 使用 sentry-cli 命令行工具（推荐）
+2. 使用 sentry API
+
+下面介绍使用sentry-cli这种方式创建 release 并关联commits，示例代码：
+
+```node
+# Assumes you're in a git repository
+export SENTRY_AUTH_TOKEN=...
+export SENTRY_ORG=my-org
+
+# Create a release
+sentry-cli releases new -p project1 your-release-name
+
+# Associate commits with the release
+sentry-cli releases set-commits --auto your-release-name
+```
+
+SENTRY_AUTH_TOKEN 可以在你Sentry账号的Auth Tokens中查看，如果没有，可以新建一个。
+
+SENTRY_ORG 是组织名称。
+
+第三个命令是给project1创建一个 release, 注意替换"your-release-name"为你在Sentry.init中配置的release名称。
+
+第四个命名是自动关联commits。注意替换"your-release-name"。
+
+
+###### 关联 commits 之后
+
+在设置完以上步骤之后，在issue页面会显示suspect commits 和 suggested assignees。这两个字段是 Sentry 根据commits、release、错误的stack trace，以及ownership rules等推断出来的。
+
+![](https://docs.sentry.io/assets/suspect-commits-highlighted-06e3323e75882a48183734ce676508250873fb389ab3af623d784980f95874e0.png)
+
+另外，你也可以再commit信息中包含issue ID，来resolve（表示已解决）这个issue。示例如下：
+
+```sh
+git ci -m "Fix: Sentry-317"
+```
+
+当你再次创建一个release后，Sentry会在这个release中把这个issue置为resolved。
+
+##### 3. 当你部署一个 release 的时候告知Sentry
+
+当你部署一个release的时候请告知Sentry，Sentry会自动发邮件给相关的用户（提交了commits给这个release的用户）。
+
+![](https://docs.sentry.io/assets/deploy-emails-a5ae41af83985913dbd26551586172f63d75660ba4789a4f332722401543f375.png)
+
+命令行示例如下：
+
+```sh
+sentry-cli releases deploys VERSION new -e ENVIRONMENT
+```
+
+#### 如何设置事件分组
+
+Sentry会根据一些信息对相似的事件进行分组，并生产一个isssue，一个issue可以包含很多的events。具体的分组策略可以参考官方文档[Rollups & Grouping](https://docs.sentry.io/data-management/rollups/?platform=node)。
+
+除了默认的分组策略，你也可以通过设置Fingerprints自定义分组，这个值会随着事件一起发送到Sentry后台。示例代码如下：
+
+```node
+Sentry.configureScope((scope) => {
+  scope.setFingerprint(['my-view-function']);
+});
+```
+
+有两种使用fingerprints的场景：
+
+1. 拆分一个group成多个groups
+
+比如你的应用会请求RPC接口或者外部的API服务，他们的报错信息基本是一样的，所以Sentry默认会将这些报错分为一组，但你可以通过fingerprints将他们分开，示例代码如下：
+
+```node
+class MyRPCError extends Error {
+  constructor(message, functionName, errorCode) {
+    super(message);
+
+    // The name of the RPC function that was called (e.g. "getAllBlogArticles")
+    this.functionName = functionName;
+
+    // For example a HTTP status code returned by the server.
+    this.errorCode = errorCode;
+  }
+}
+
+Sentry.init({
+  ...,
+  beforeSend: (event, hint) => {
+    const exception = hint.originalException;
+
+    if (exception instanceof MyRPCError) {
+      event.fingerprint = [
+        '{{ default }}',
+        String(exception.functionName),
+        String(exception.errorCode)
+      ];
+    }
+
+    return event;
+  }
+});
+```
+
+2. 合并多个groups成一个group
+
+有时候很多group太小，并且这些group其实是同一个大类的错误，可以用fingprints合并成一个group，示例代码如下：
+
+```node
+class DatabaseConnectionError extends Error {}
+
+Sentry.init({
+  ...,
+  beforeSend: (event, hint) => {
+    const exception = hint.originalException;
+
+    if (exception instanceof DatabaseConnectionError) {
+      event.fingerprint = ['database-connection-error'];
+    }
+
+    return event;
+  }
+});
+```
+
+#### 如何设置 SourceMaps
+
+如果没有sourcemaps，在sentry的issue中只能看到压缩后的代码，对于排查问题非常不方便，所以应该开启soucemaps功能。以下针对使用Webpack打包的项目做简单介绍。
+
+首先安装对应的webpack插件：
+
+```sh
+npm install --save-dev @sentry/webpack-plugin
+# or
+yarn add --dev @sentry/webpack-plugin
+```
+
+在项目根目录创建一个.sentryclirc，需要配置token、org、project等信息，具体见官方文档[Configuration and Authentication](https://docs.sentry.io/cli/configuration/)。
+
+然后在webpack.config.js中添加如下代码：
+
+```node
+const SentryWebpackPlugin = require('@sentry/webpack-plugin');
+
+module.exports = {
+  // other configuration
+  plugins: [
+    new SentryWebpackPlugin({
+      include: '.',
+      ignoreFile: '.sentrycliignore',
+      ignore: ['node_modules', 'webpack.config.js'],
+      configFile: 'sentry.properties'
+    })
+  ]
+};
+```
+
+除了webpack自动上传的方式，你也可以通过sentry-cli手动上传sourcemaps。
+
+首先创建一个release:
+
+```sh
+sentry-cli releases new <release_name>
+```
+
+注意<release_name>需要和你init中配置的一样。
+
+然后使用upload-sourcemaps上传sourcemaps：
+
+```sh
+sentry-cli releases files <release_name> upload-sourcemaps /path/to/files
+```
+
+最后完成这次release：
+
+```sh
+sentry-cli releases finalize <release_name>
+```
+
+成功完成以上步骤后，当触发了一个issue后可以在issue页面看到报错的源代码，如下图所示：
+
+![](https://i.loli.net/2019/05/08/5cd2a34179604.png)
